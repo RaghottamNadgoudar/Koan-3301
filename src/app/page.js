@@ -75,33 +75,51 @@ export default function HomePage() {
     }
   };
 
-  // Handle secret element interaction for audio download
-  const handleSecretInteraction = () => {
+  // Handle secret element interaction for audio download - Updated to use API route
+  const handleSecretInteraction = async () => {
     setStatusMessage("Anomaly detected... initiating contact...");
-    const ws = new WebSocket("ws://localhost:8080");
-    ws.binaryType = "blob";
 
-    ws.onopen = () => {
+    try {
       setStatusMessage("Connection established. Receiving transmission...");
-    };
 
-    ws.onmessage = (event) => {
-      const url = URL.createObjectURL(event.data);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "echo.wav";
-      document.body.appendChild(a);
-      a.click();
-      URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      setStatusMessage(
-        "Audio transmission captured as echo.wav. Decryption required."
-      );
-    };
+      const response = await fetch("/api/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "get_audio" }),
+      });
 
-    ws.onerror = () => {
+      if (!response.ok) {
+        throw new Error("Failed to fetch audio");
+      }
+
+      const data = await response.json();
+
+      if (data.audioData) {
+        // Convert base64 back to audio blob
+        const audioBlob = new Blob(
+          [Uint8Array.from(atob(data.audioData), (c) => c.charCodeAt(0))],
+          { type: "audio/wav" }
+        );
+
+        const url = URL.createObjectURL(audioBlob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "echo.wav";
+        document.body.appendChild(a);
+        a.click();
+        URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        setStatusMessage(
+          "Audio transmission captured as echo.wav. Decryption required."
+        );
+      } else {
+        throw new Error("No audio data received");
+      }
+    } catch (error) {
       setStatusMessage("Connection to the source failed. Try again.");
-    };
+      console.error("Audio download error:", error);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -201,7 +219,7 @@ export default function HomePage() {
             </h1>
 
             <p className="text-lg sm:text-xl lg:text-2xl text-gray-300 font-light tracking-wide max-w-2xl mx-auto leading-relaxed px-4">
-              Crack if you can?
+              What is the sound of one hand clapping?
             </p>
 
             <div className="mt-4 sm:mt-6 h-px bg-gradient-to-r from-transparent via-cyan-400/50 to-transparent max-w-md mx-auto"></div>
